@@ -1,0 +1,58 @@
+游戏类Game：包含渲染和游戏代码，将窗口代码与游戏代码解耦合，便于移植不同的窗口系统中。
+Game类里有关卡容器
+Init()；//加载纹理，加载关卡，加载玩家(挡板)
+ProcessInput()；
+Updata()；//Ball->move()用来更新球的位置，调用DoCollisions()检测碰撞，Particles->Update()更新每帧两个粒子
+Render();//调用GameLevel类的Draw函数渲染，先渲染背景，再渲染粒子，再渲染球
+DoCollisions();//检测球是否与每个砖块发生碰撞,调用CheckCollision()返回是否碰撞，碰撞方向，差矢量三元组，进行球重定位，改变球的速度方向
+enum GameState {
+    GAME_ACTIVE,
+    GAME_MENU,
+    GAME_WIN
+};//Game类封装了枚举类型成员变量，表示游戏的状态
+
+
+由于会频繁地重用着色器和纹理，需要创建着色器类Shader和纹理类Texture
+
+
+如果让着色器和纹理自己加载文件，这违反了单一功能原则，因此需要创建资源管理器类ResouceManager
+
+
+渲染精灵通俗的说就是简单的顶点颜色着色器，用来渲染四边形并进行纹理贴图
+封装Shader对象，一个顶点数组对象quadVAO，初始化渲染函数initRenderData()，绘制函数DrawSprite()
+
+
+每个砖块作为游戏对象可以用GameObject类存储，它有一些状态数据(位置、大小、速率)，颜色、纹理、是否可被摧毁。
+
+
+关卡是由砖块组成，可以将关卡写成GameLevel类，
+load();//从文件中加载关卡
+Draw(SpriteRenderer &renderer)//渲染关卡
+GLboolean IsCompleted();//检查关卡是否完成
+init();//初始化，给每个砖块位置，大小，颜色，纹理
+1 1 1 1 1
+2 2 0 0 2
+3 3 4 4 3//关卡数据1代表不可摧毁，0代表没有砖块，其他代表坚硬程度
+
+
+需要一个球对象BallObject,相较于通用的游戏对象GameObject，球需要半径和是否在板子上的布尔值
+move();//position+=dt*velocity;当position超出边界时，反转对应轴的速度，并把位置置为边界值
+reset();
+
+
+物体间的碰撞检测使用简单外形来检测，AABB代表的是轴对齐碰撞箱(Axis-aligned Bounding Box)
+AABB-AABB碰撞检测原理：当每个轴上的坐标有重叠，就发生了碰撞
+AABB-AABB检测公式：collisionX = one.Position.x + one.Size.x >= two.Position.x &&two.Position.x + two.Size.x >= one.Position.x;
+collisionY = one.Position.y + one.Size.y >= two.Position.y &&two.Position.y + two.Size.y >= one.Position.y;
+return collisionX&&collisionY;
+AABB-圆碰撞检测原理：当AABB上距离圆最近点到圆中心距离小于半径，就发生了碰撞
+AABB上距圆的最近点max(-aabb_half_extents, std::min(aabb_half_extents, center - aabb_center));
+
+
+检测到碰撞后需要做：1.重定位小球。
+2.改变球的速度方向。
+在DoCollisions()函数里面根据CheckCollision()返回的碰撞方向difference(圆中心指向AABB上最近点的矢量)，计算在哪个边界碰撞
+
+
+建立一个容器存储粒子，从前到后依次初始化几个粒子，当遍历到容器的末端的时候，容器前端的粒子已经被杀死
+ParticleGenerator类
